@@ -10,7 +10,7 @@ import (
 
 var lParen = p.Rune('(')
 var rParen = p.Rune(')')
-var quote = p.Rune('"')
+var quot = p.Rune('"')
 
 var copyAbove = p.String("^^")
 var colRef = p.RuneInRanges(unicode.Upper)
@@ -25,6 +25,15 @@ var intLiteral = Map(
 		return res
 	},
 )
+
+// a quoted string, disregard possible escaped quotations for now
+var stringLiteral = Map(
+	p.SequenceOf3[string, []string, string](quot, p.ZeroOrMore[string](p.RuneNotIn("\"")), quot),
+	func(seq p.Tuple3[string, []string, string]) string {
+		return strings.Join(seq.B, "")
+	},
+)
+
 var cellRef = p.SequenceOf2[string, int](colRef, intLiteral)
 var copyLastInColumn = p.SequenceOf2[string, string](colRef, p.Rune('^'))
 var labelName = Map(

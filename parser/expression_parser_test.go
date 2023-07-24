@@ -61,3 +61,22 @@ func TestLabelRelativeRowRefParser(t *testing.T) {
 		assert.Equal(t, c.wantRowNum, match.B)
 	}
 }
+
+func TestStringLiteralParser(t *testing.T) {
+	cases := []struct {
+		in   string
+		want string
+	}{
+		{`"a quoted string"`, "a quoted string"},
+		{`"a quoted string"and then some`, "a quoted string"},
+		{`""`, ""},
+	}
+
+	for _, c := range cases {
+		input := p.NewInput(c.in)
+		match, ok, err := stringLiteral.Parse(input)
+		assert.True(t, ok)
+		assert.Nil(t, err)
+		assert.Equal(t, c.want, match)
+	}
+}
