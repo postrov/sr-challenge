@@ -5,13 +5,15 @@ import (
 )
 
 type Expr interface {
-	isArExpr()
+	isExpr()
 }
 
 type FunCall struct {
-	name   string
-	params []Expression
+	Name   string
+	Params []Expr
 }
+
+func (FunCall) isExpr() {}
 
 type BinaryOperator int
 
@@ -39,7 +41,7 @@ const (
 
 type IntLit int
 
-func (IntLit) isArExpr() {}
+func (IntLit) isExpr() {}
 
 type InfixOp struct {
 	Lhs Expr
@@ -61,6 +63,6 @@ func (op InfixOp) String() string {
 	return fmt.Sprintf("%v %v %v", lhs, op.Op, rhs)
 }
 
-func (InfixOp) isArExpr() {}
+func (InfixOp) isExpr() {}
 
 type NoResult struct{}

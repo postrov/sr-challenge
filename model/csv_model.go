@@ -41,8 +41,4 @@ func (FormulaCell) isCell() {}
 
 func (EmptyCell) isCell() {}
 
-type Expression interface {
-	isExpression()
-}
-
 // expr: float | int | cellref | unary op

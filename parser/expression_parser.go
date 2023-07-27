@@ -6,7 +6,9 @@ import (
 	"strings"
 	"unicode"
 
+	"github.com/a-h/parse"
 	p "github.com/a-h/parse"
+	"pasza.org/sr-challenge/model"
 	m "pasza.org/sr-challenge/model"
 )
 
@@ -14,28 +16,24 @@ var lParen = p.Rune('(')
 var rParen = p.Rune(')')
 var quot = p.Rune('"')
 
-var copyAbove = p.String("^^")
-var colRef = p.RuneInRanges(unicode.Upper)
-var intLiteral = Map(
+var copyAboveParser = p.String("^^")
+var colRefParser = p.RuneInRanges(unicode.Upper)
+var intLitParser = FallibleMap(
 	p.OneOrMore[string](p.RuneInRanges(unicode.Digit)),
-	func(digits []string) int {
-		res, err := strconv.Atoi(strings.Join(digits, ""))
-		if err != nil {
-			panic("Could not parse int literal")
-		}
-		return res
+	func(digits []string) (int, error) {
+		return strconv.Atoi(strings.Join(digits, ""))
 	},
 )
 
 // a quoted string, disregard possible escaped quotations for now
-var stringLiteral = Map(
+var stringLiteralParser = Map(
 	p.SequenceOf3[string, []string, string](quot, p.ZeroOrMore[string](p.RuneNotIn("\"")), quot),
 	func(seq p.Tuple3[string, []string, string]) string {
 		return strings.Join(seq.B, "")
 	},
 )
 
-var floatLiteral = Map(
+var floatLitParser = Map(
 	p.SequenceOf3[[]string, string, []string](
 		p.OneOrMore[string](p.RuneInRanges(unicode.Digit)),
 		p.Rune('.'),
@@ -51,10 +49,10 @@ var floatLiteral = Map(
 	},
 )
 
-var cellRef = p.SequenceOf2[string, int](colRef, intLiteral)
+var cellRefParser = p.SequenceOf2[string, int](colRefParser, intLitParser)
 
 // todo: perhaps map to something single
-var copyLastInColumn = p.SequenceOf2[string, string](colRef, p.Rune('^'))
+var copyLastInColumnParser = p.SequenceOf2[string, string](colRefParser, p.Rune('^'))
 var labelName = Map(
 	p.OneOrMore[string](p.Any[string](
 		p.RuneInRanges(unicode.Lower),
@@ -64,17 +62,17 @@ var labelName = Map(
 		return strings.Join(chars, "")
 	},
 )
-var relativeRowRef = Map(
-	p.SequenceOf3[string, int, string](p.Rune('<'), intLiteral, p.Rune('>')),
+var relativeRowRefParser = Map(
+	p.SequenceOf3[string, int, string](p.Rune('<'), intLitParser, p.Rune('>')),
 	func(t p.Tuple3[string, int, string]) int {
 		return t.B
 	},
 )
-var labelRelativeRowRef = Map(
+var labelRelativeRowRefParser = Map(
 	p.SequenceOf3[string, string, int](
 		p.Rune('@'),
 		labelName,
-		relativeRowRef,
+		relativeRowRefParser,
 	),
 	func(t p.Tuple3[string, string, int]) p.Tuple2[string, int] {
 		return p.Tuple2[string, int]{
@@ -84,12 +82,6 @@ var labelRelativeRowRef = Map(
 	},
 )
 
-// var funcCall = Map(
-// 	p.Seq
-// )
-
-///// 1 + 2 * 3
-
 var chompWhiteSpace p.Parser[m.NoResult] = Map(
 	p.ZeroOrMore(p.RuneIn(" \t")),
 	func([]string) m.NoResult {
@@ -98,14 +90,14 @@ var chompWhiteSpace p.Parser[m.NoResult] = Map(
 )
 
 // temporary, eventually will include (expr), float, funCall, unaryOps
-var parsePrimary = Map(
-	intLiteral,
+var primaryParser = Map(
+	intLitParser,
 	func(value int) m.IntLit {
 		return m.IntLit(value)
 	},
 )
 
-var parseBinOp = Map(
+var binaryOperatorParser = Map(
 	p.RuneIn("+-*/"),
 	func(op string) m.BinaryOperator {
 		switch op {
@@ -123,20 +115,21 @@ var parseBinOp = Map(
 	},
 )
 
-var arExprParser p.Parser[m.Expr] = p.Func(func(in *p.Input) (match m.Expr, ok bool, err error) {
+// parses expression composed of arithmetic operations on other expressions
+var exprParser p.Parser[m.Expr] = p.Func(func(in *p.Input) (match m.Expr, ok bool, err error) {
 	primaries := make([]m.Expr, 0)
 	binOps := make([]m.BinaryOperator, 0)
 
 	chompWhiteSpace.Parse(in)
 
-	pMatch, ok, err := parsePrimary.Parse(in)
+	pMatch, ok, err := primaryParser.Parse(in)
 	if !ok || err != nil {
 		return
 	}
 	primaries = append(primaries, pMatch)
 	for ok {
 		chompWhiteSpace.Parse(in)
-		oMatch, ok, err := parseBinOp.Parse(in)
+		oMatch, ok, err := binaryOperatorParser.Parse(in)
 		if !ok {
 			break
 		}
@@ -145,7 +138,7 @@ var arExprParser p.Parser[m.Expr] = p.Func(func(in *p.Input) (match m.Expr, ok b
 		}
 		binOps = append(binOps, oMatch)
 		chompWhiteSpace.Parse(in)
-		match, ok, err := parsePrimary.Parse(in)
+		match, ok, err := primaryParser.Parse(in)
 		if !ok || err != nil {
 			return match, ok, err
 		}
@@ -154,8 +147,41 @@ var arExprParser p.Parser[m.Expr] = p.Func(func(in *p.Input) (match m.Expr, ok b
 
 	// list of ae1..aeN
 	// list of op1..opN-1 (may be empty)
-	// match, ok, err = IntLit(3), true, nil
-	// match = xxx(primaries, binOps)
 	match = fixOperatorPrecedence(primaries, binOps)
 	return
 })
+
+var funNameParser = Map(
+	p.OneOrMore(p.RuneInRanges(unicode.Letter)),
+	func(chars []string) string {
+		return strings.Join(chars, "")
+	},
+)
+
+var argSeparatorParser = Map(
+	parse.SequenceOf3[model.NoResult, string, model.NoResult](
+		chompWhiteSpace,
+		parse.Rune(','),
+		chompWhiteSpace,
+	),
+	func(_ parse.Tuple3[model.NoResult, string, model.NoResult]) model.NoResult {
+		return model.NoResult{}
+	},
+)
+
+var argListParser = SeparatedList0[m.Expr, m.NoResult](exprParser, argSeparatorParser)
+
+var funCallParser = Map(
+	p.SequenceOf4[string, string, []m.Expr, string](
+		funNameParser,
+		lParen,
+		argListParser,
+		rParen,
+	),
+	func(seq p.Tuple4[string, string, []m.Expr, string]) m.FunCall {
+		return m.FunCall{
+			Name:   seq.A,
+			Params: seq.C,
+		}
+	},
+)

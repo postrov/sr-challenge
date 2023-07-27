@@ -39,7 +39,7 @@ func TestRelativeRowRefParser(t *testing.T) {
 
 	for _, c := range cases {
 		input := p.NewInput(c.in)
-		match, ok, err := relativeRowRef.Parse(input)
+		match, ok, err := relativeRowRefParser.Parse(input)
 		assert.True(t, ok)
 		assert.Nil(t, err)
 		assert.Equal(t, c.want, match)
@@ -58,7 +58,7 @@ func TestFloatLiteralParser(t *testing.T) {
 
 	for _, c := range cases {
 		input := p.NewInput(c.in)
-		match, ok, err := floatLiteral.Parse(input)
+		match, ok, err := floatLitParser.Parse(input)
 
 		assert.True(t, ok)
 		assert.Nil(t, err)
@@ -77,7 +77,7 @@ func TestLabelRelativeRowRefParser(t *testing.T) {
 
 	for _, c := range cases {
 		input := p.NewInput(c.in)
-		match, ok, err := labelRelativeRowRef.Parse(input)
+		match, ok, err := labelRelativeRowRefParser.Parse(input)
 		assert.True(t, ok)
 		assert.Nil(t, err)
 		assert.Equal(t, c.wantLabelName, match.A)
@@ -97,7 +97,7 @@ func TestStringLiteralParser(t *testing.T) {
 
 	for _, c := range cases {
 		input := p.NewInput(c.in)
-		match, ok, err := stringLiteral.Parse(input)
+		match, ok, err := stringLiteralParser.Parse(input)
 		assert.True(t, ok)
 		assert.Nil(t, err)
 		assert.Equal(t, c.want, match)
@@ -118,7 +118,7 @@ func TestExprParser(t *testing.T) {
 	}
 	for _, c := range cases {
 		input := p.NewInput(c.in)
-		match, ok, err := arExprParser.Parse(input)
+		match, ok, err := exprParser.Parse(input)
 		assert.True(t, ok)
 		assert.Nil(t, err)
 		matchRepr := fmt.Sprint(match)
@@ -128,14 +128,42 @@ func TestExprParser(t *testing.T) {
 
 func TestIntLitParser(t *testing.T) {
 	in := p.NewInput("123")
-	m, o, e := parsePrimary.Parse(in)
+	m, o, e := primaryParser.Parse(in)
 	assert.True(t, o)
 	assert.Nil(t, e)
 	assert.Equal(t, model.IntLit(123), m)
 
 	in = p.NewInput("1 + 2 * 3")
-	m, o, e = parsePrimary.Parse(in)
+	m, o, e = primaryParser.Parse(in)
 	assert.True(t, o)
 	assert.Nil(t, e)
 	assert.Equal(t, model.IntLit(1), m)
+}
+
+func TestFunCallParser(t *testing.T) {
+	cases := []struct {
+		in           string
+		wantName     string
+		wantArgc     int
+		wantArgvRepr []string
+	}{
+		{
+			"add(1, 2 + 3, 4)",
+			"add",
+			3,
+			[]string{"1", "2 + 3", "4"},
+		},
+	}
+
+	for _, c := range cases {
+		input := p.NewInput(c.in)
+		match, ok, err := funCallParser.Parse(input)
+		assert.True(t, ok)
+		assert.Nil(t, err)
+		assert.Equal(t, c.wantName, match.Name)
+		assert.Equal(t, c.wantArgc, len(match.Params))
+		for i, v := range match.Params {
+			assert.Equalf(t, c.wantArgvRepr[i], fmt.Sprint(v), "Wrong argument[%d] for %s", i, match.Name)
+		}
+	}
 }
