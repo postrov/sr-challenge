@@ -24,3 +24,26 @@ func Map[A, B any](a p.Parser[A], mapper func(A) B) p.Parser[B] {
 		mapper: mapper,
 	}
 }
+
+// / fallible map
+type fallibleMapParser[A, B any] struct {
+	A      p.Parser[A]
+	mapper func(A) (B, error)
+}
+
+func (p fallibleMapParser[A, B]) Parse(in *p.Input) (match B, ok bool, err error) {
+	matchA, ok, err := p.A.Parse(in)
+	if err != nil || !ok {
+		return
+	}
+
+	match, err = p.mapper(matchA)
+	return
+}
+
+func FallibleMap[A, B any](a p.Parser[A], mapper func(A) (b B, err error)) p.Parser[B] {
+	return fallibleMapParser[A, B]{
+		A:      a,
+		mapper: mapper,
+	}
+}

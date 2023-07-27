@@ -1,11 +1,13 @@
 package parser
 
 import (
+	"fmt"
 	"strconv"
 	"strings"
 	"unicode"
 
 	p "github.com/a-h/parse"
+	m "pasza.org/sr-challenge/model"
 )
 
 var lParen = p.Rune('(')
@@ -21,7 +23,6 @@ var intLiteral = Map(
 		if err != nil {
 			panic("Could not parse int literal")
 		}
-
 		return res
 	},
 )
@@ -34,7 +35,25 @@ var stringLiteral = Map(
 	},
 )
 
+var floatLiteral = Map(
+	p.SequenceOf3[[]string, string, []string](
+		p.OneOrMore[string](p.RuneInRanges(unicode.Digit)),
+		p.Rune('.'),
+		p.OneOrMore[string](p.RuneInRanges(unicode.Digit)),
+	),
+	func(seq p.Tuple3[[]string, string, []string]) float64 {
+		floatRepr := fmt.Sprintf("%s.%s", strings.Join(seq.A, ""), strings.Join(seq.C, ""))
+		res, err := strconv.ParseFloat(floatRepr, 64)
+		if err != nil {
+			panic("Could not parse float literal")
+		}
+		return res
+	},
+)
+
 var cellRef = p.SequenceOf2[string, int](colRef, intLiteral)
+
+// todo: perhaps map to something single
 var copyLastInColumn = p.SequenceOf2[string, string](colRef, p.Rune('^'))
 var labelName = Map(
 	p.OneOrMore[string](p.Any[string](
@@ -65,4 +84,119 @@ var labelRelativeRowRef = Map(
 	},
 )
 
-// var funcCall
+// var funcCall = Map(
+// 	p.Seq
+// )
+
+///// 1 + 2 * 3
+
+type ArExpr interface {
+	isArExpr()
+}
+
+type IntLit int
+
+func (IntLit) isArExpr() {}
+
+type Op struct {
+	lhs ArExpr
+	rhs ArExpr
+	op  m.BinOp
+}
+
+func (op Op) String() string {
+	var lhs, rhs string
+	if v, ok := op.lhs.(IntLit); ok {
+		lhs = strconv.Itoa(int(v))
+	} else {
+		lhs = fmt.Sprintf("(%v)", op.lhs)
+	}
+	if v, ok := op.rhs.(IntLit); ok {
+		rhs = strconv.Itoa(int(v))
+	} else {
+		rhs = fmt.Sprintf("(%v)", op.rhs)
+	}
+
+	return fmt.Sprintf("%v %v %v", lhs, op.op, rhs)
+}
+
+func (Op) isArExpr() {}
+
+type NoResult struct{}
+
+var chompWhiteSpace p.Parser[NoResult] = Map(
+	p.ZeroOrMore(p.RuneIn(" \t")),
+	func([]string) NoResult {
+		return struct{}{}
+	},
+)
+
+// temporary, eventually will include (expr), float, funCall, unaryOps
+var parsePrimary = Map(
+	intLiteral,
+	func(value int) IntLit {
+		return IntLit(value)
+	},
+)
+
+var parseBinOp = Map(
+	p.RuneIn("+-*/"),
+	func(op string) m.BinOp {
+		switch op {
+		case "+":
+			return m.ADD
+		case "-":
+			return m.SUB
+		case "*":
+			return m.MUL
+		case "/":
+			return m.DIV
+		default:
+			panic("Unknown binary operation")
+		}
+	},
+)
+
+var arExprParser p.Parser[ArExpr] = p.Func(func(in *p.Input) (match ArExpr, ok bool, err error) {
+	primaries := make([]ArExpr, 0)
+	binOps := make([]m.BinOp, 0)
+
+	chompWhiteSpace.Parse(in)
+
+	pMatch, ok, err := parsePrimary.Parse(in)
+	if !ok || err != nil {
+		return
+	}
+	primaries = append(primaries, pMatch)
+	for ok {
+		chompWhiteSpace.Parse(in)
+		oMatch, ok, err := parseBinOp.Parse(in)
+		if !ok {
+			break
+		}
+		if err != nil {
+			return IntLit(3), ok, err
+		}
+		binOps = append(binOps, oMatch)
+		chompWhiteSpace.Parse(in)
+		match, ok, err := parsePrimary.Parse(in)
+		if !ok || err != nil {
+			return match, ok, err
+		}
+		primaries = append(primaries, match)
+	}
+
+	// list of ae1..aeN
+	// list of op1..opN-1 (may be empty)
+	// match, ok, err = IntLit(3), true, nil
+	// match = xxx(primaries, binOps)
+	match = fixOperatorPrecedence(primaries, binOps)
+	return
+})
+
+var opPrecedence map[m.BinOp]int = map[m.BinOp]int{
+	m.MUL: 2,
+	m.DIV: 2,
+	m.ADD: 1,
+	m.SUB: 1,
+}

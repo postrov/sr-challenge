@@ -40,3 +40,44 @@ func (StringCell) isCell() {}
 func (FormulaCell) isCell() {}
 
 func (EmptyCell) isCell() {}
+
+type Expression interface {
+	isExpression()
+}
+
+type FunCall struct {
+	name   string
+	params []Expression
+}
+
+type BinOp int
+
+const (
+	MUL BinOp = 0
+	DIV       = 1
+	ADD       = 2
+	SUB       = 3
+)
+
+func (op BinOp) String() string {
+	switch op {
+	case MUL:
+		return "*"
+	case DIV:
+		return "/"
+	case ADD:
+		return "+"
+	case SUB:
+		return "-"
+	default:
+		return "?"
+	}
+}
+
+type InfixOp struct {
+	lhs Expression
+	rhs Expression
+	op  BinOp
+}
+
+// expr: float | int | cellref | unary op

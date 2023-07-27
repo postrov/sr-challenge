@@ -7,7 +7,6 @@ import (
 )
 
 func main() {
-	defer fmt.Println("dupa")
 	s := parser.Parser()
 	fmt.Println(s)
 }

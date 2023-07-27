@@ -1,6 +1,8 @@
 package parser
 
 import (
+	"fmt"
+	"math"
 	"testing"
 
 	p "github.com/a-h/parse"
@@ -43,6 +45,26 @@ func TestRelativeRowRefParser(t *testing.T) {
 	}
 }
 
+const epsilon float64 = 0.000001
+
+func TestFloatLiteralParser(t *testing.T) {
+	cases := []struct {
+		in   string
+		want float64
+	}{
+		{"31.337", 31.337},
+	}
+
+	for _, c := range cases {
+		input := p.NewInput(c.in)
+		match, ok, err := floatLiteral.Parse(input)
+
+		assert.True(t, ok)
+		assert.Nil(t, err)
+		assert.Less(t, math.Abs(c.want-match), epsilon)
+	}
+}
+
 func TestLabelRelativeRowRefParser(t *testing.T) {
 	cases := []struct {
 		in            string
@@ -79,4 +101,40 @@ func TestStringLiteralParser(t *testing.T) {
 		assert.Nil(t, err)
 		assert.Equal(t, c.want, match)
 	}
+}
+
+/// arExpr
+
+func TestArExprParser(t *testing.T) {
+	cases := []struct {
+		in   string
+		want string
+	}{
+		{"15", "15"},
+		{"1 + 2 * 3", "1 + (2 * 3)"},
+		{"1 + 2 * 3 + 4", "(1 + (2 * 3)) + 4"},
+		{"1 + 2 * 3 + 4 * 5 - 6", "((1 + (2 * 3)) + (4 * 5)) - 6"},
+	}
+	for _, c := range cases {
+		input := p.NewInput(c.in)
+		match, ok, err := arExprParser.Parse(input)
+		assert.True(t, ok)
+		assert.Nil(t, err)
+		matchRepr := fmt.Sprint(match)
+		assert.Equal(t, c.want, matchRepr)
+	}
+}
+
+func TestIntLitParser(t *testing.T) {
+	in := p.NewInput("123")
+	m, o, e := parsePrimary.Parse(in)
+	assert.True(t, o)
+	assert.Nil(t, e)
+	assert.Equal(t, IntLit(123), m)
+
+	in = p.NewInput("1 + 2 * 3")
+	m, o, e = parsePrimary.Parse(in)
+	assert.True(t, o)
+	assert.Nil(t, e)
+	assert.Equal(t, IntLit(1), m)
 }
