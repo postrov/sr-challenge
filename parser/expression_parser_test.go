@@ -7,7 +7,7 @@ import (
 
 	p "github.com/a-h/parse"
 	"github.com/stretchr/testify/assert"
-	"pasza.org/sr-challenge/model"
+	m "pasza.org/sr-challenge/model"
 )
 
 func TestLabelNameParser(t *testing.T) {
@@ -62,7 +62,10 @@ func TestFloatLiteralParser(t *testing.T) {
 
 		assert.True(t, ok)
 		assert.Nil(t, err)
-		assert.Less(t, math.Abs(c.want-match), epsilon)
+
+		value, ok := match.(m.FloatLit)
+		assert.True(t, ok)
+		assert.Less(t, math.Abs(c.want-float64(value)), epsilon)
 	}
 }
 
@@ -80,12 +83,16 @@ func TestLabelRelativeRowRefParser(t *testing.T) {
 		match, ok, err := labelRelativeRowRefParser.Parse(input)
 		assert.True(t, ok)
 		assert.Nil(t, err)
-		assert.Equal(t, c.wantLabelName, match.A)
-		assert.Equal(t, c.wantRowNum, match.B)
+
+		value, ok := match.(m.LabelRelativeRowRef)
+		assert.True(t, ok)
+
+		assert.Equal(t, c.wantLabelName, value.Label)
+		assert.Equal(t, c.wantRowNum, value.RelativeRow)
 	}
 }
 
-func TestStringLiteralParser(t *testing.T) {
+func TestStringLiteralParserOk(t *testing.T) {
 	cases := []struct {
 		in   string
 		want string
@@ -97,11 +104,38 @@ func TestStringLiteralParser(t *testing.T) {
 
 	for _, c := range cases {
 		input := p.NewInput(c.in)
-		match, ok, err := stringLiteralParser.Parse(input)
+		match, ok, err := stringLitParser.Parse(input)
 		assert.True(t, ok)
 		assert.Nil(t, err)
-		assert.Equal(t, c.want, match)
+		value, ok := match.(m.StringLit)
+		assert.True(t, ok)
+		assert.Equal(t, c.want, string(value))
 	}
+}
+
+func TestStringLiteralParserFail(t *testing.T) {
+	cases := []struct {
+		in string
+		ok bool
+	}{
+		{`15`, false},
+	}
+
+	for _, c := range cases {
+		input := p.NewInput(c.in)
+		_, ok, err := stringLitParser.Parse(input)
+		assert.Equal(t, c.ok, ok)
+		assert.Nil(t, err)
+	}
+}
+
+func TestPrimaryParser(t *testing.T) {
+	input := p.NewInput("15 + 33")
+	match, ok, err := primaryParser.Parse(input)
+
+	assert.True(t, ok)
+	assert.Nil(t, err)
+	fmt.Print(match)
 }
 
 /// arExpr
@@ -115,6 +149,7 @@ func TestExprParser(t *testing.T) {
 		{"1 + 2 * 3", "1 + (2 * 3)"},
 		{"1 + 2 * 3 + 4", "(1 + (2 * 3)) + 4"},
 		{"1 + 2 * 3 + 4 * 5 - 6", "((1 + (2 * 3)) + (4 * 5)) - 6"},
+		{`E^+sum(spread(split(D3, ",")))`, `E^ + sum(spread(split(D3, ",")))`},
 	}
 	for _, c := range cases {
 		input := p.NewInput(c.in)
@@ -128,16 +163,16 @@ func TestExprParser(t *testing.T) {
 
 func TestIntLitParser(t *testing.T) {
 	in := p.NewInput("123")
-	m, o, e := primaryParser.Parse(in)
-	assert.True(t, o)
-	assert.Nil(t, e)
-	assert.Equal(t, model.IntLit(123), m)
+	match, ok, err := primaryParser.Parse(in)
+	assert.True(t, ok)
+	assert.Nil(t, err)
+	assert.Equal(t, m.IntLit(123), match)
 
 	in = p.NewInput("1 + 2 * 3")
-	m, o, e = primaryParser.Parse(in)
-	assert.True(t, o)
-	assert.Nil(t, e)
-	assert.Equal(t, model.IntLit(1), m)
+	match, ok, err = primaryParser.Parse(in)
+	assert.True(t, ok)
+	assert.Nil(t, err)
+	assert.Equal(t, m.IntLit(1), match)
 }
 
 func TestFunCallParser(t *testing.T) {
@@ -160,10 +195,14 @@ func TestFunCallParser(t *testing.T) {
 		match, ok, err := funCallParser.Parse(input)
 		assert.True(t, ok)
 		assert.Nil(t, err)
-		assert.Equal(t, c.wantName, match.Name)
-		assert.Equal(t, c.wantArgc, len(match.Params))
-		for i, v := range match.Params {
-			assert.Equalf(t, c.wantArgvRepr[i], fmt.Sprint(v), "Wrong argument[%d] for %s", i, match.Name)
+
+		value, ok := match.(m.FunCall)
+		assert.True(t, ok)
+
+		assert.Equal(t, c.wantName, value.Name)
+		assert.Equal(t, c.wantArgc, len(value.Params))
+		for i, v := range value.Params {
+			assert.Equalf(t, c.wantArgvRepr[i], fmt.Sprint(v), "Wrong argument[%d] for %s", i, value.Name)
 		}
 	}
 }

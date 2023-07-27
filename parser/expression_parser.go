@@ -6,53 +6,95 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/a-h/parse"
 	p "github.com/a-h/parse"
-	"pasza.org/sr-challenge/model"
 	m "pasza.org/sr-challenge/model"
 )
+
+var primaryParserProxy p.Parser[m.Expr]
+
+func init() {
+	primaryParserProxy = primaryParser
+}
 
 var lParen = p.Rune('(')
 var rParen = p.Rune(')')
 var quot = p.Rune('"')
 
-var copyAboveParser = p.String("^^")
+var copyAboveParser = Map(
+	p.String("^^"),
+	func(string) m.Expr {
+		return m.CopyAbove{}
+	},
+)
 var colRefParser = p.RuneInRanges(unicode.Upper)
-var intLitParser = FallibleMap(
+var intParser = FallibleMap(
 	p.OneOrMore[string](p.RuneInRanges(unicode.Digit)),
 	func(digits []string) (int, error) {
 		return strconv.Atoi(strings.Join(digits, ""))
 	},
 )
 
-// a quoted string, disregard possible escaped quotations for now
-var stringLiteralParser = Map(
-	p.SequenceOf3[string, []string, string](quot, p.ZeroOrMore[string](p.RuneNotIn("\"")), quot),
-	func(seq p.Tuple3[string, []string, string]) string {
-		return strings.Join(seq.B, "")
+var intLitParser = Map(
+	intParser,
+	func(value int) m.Expr {
+		return m.IntLit(value)
 	},
 )
 
-var floatLitParser = Map(
+// a quoted string, disregard possible escaped quotations for now
+var stringLitParser = Map(
+	p.SequenceOf3[string, []string, string](quot, p.ZeroOrMore[string](p.RuneNotIn("\"")), quot),
+	func(seq p.Tuple3[string, []string, string]) m.Expr {
+		return m.StringLit(strings.Join(seq.B, ""))
+	},
+)
+
+var floatParser = FallibleMap(
 	p.SequenceOf3[[]string, string, []string](
 		p.OneOrMore[string](p.RuneInRanges(unicode.Digit)),
 		p.Rune('.'),
 		p.OneOrMore[string](p.RuneInRanges(unicode.Digit)),
 	),
-	func(seq p.Tuple3[[]string, string, []string]) float64 {
+	func(seq p.Tuple3[[]string, string, []string]) (float64, error) {
 		floatRepr := fmt.Sprintf("%s.%s", strings.Join(seq.A, ""), strings.Join(seq.C, ""))
-		res, err := strconv.ParseFloat(floatRepr, 64)
-		if err != nil {
-			panic("Could not parse float literal")
-		}
-		return res
+		return strconv.ParseFloat(floatRepr, 64)
+	},
+)
+var floatLitParser = Map(
+	floatParser,
+	func(value float64) m.Expr {
+		return m.FloatLit(value)
 	},
 )
 
-var cellRefParser = p.SequenceOf2[string, int](colRefParser, intLitParser)
+var cellRefParser = Map(
+	p.SequenceOf2[string, int](colRefParser, intParser),
+	func(seq p.Tuple2[string, int]) m.Expr {
+		return m.CellRef{
+			Col: seq.A,
+			Row: seq.B,
+		}
+	},
+)
 
-// todo: perhaps map to something single
-var copyLastInColumnParser = p.SequenceOf2[string, string](colRefParser, p.Rune('^'))
+var copyColumnAboveParser = Map(
+	p.SequenceOf2[string, string](colRefParser, p.Rune('^')),
+	func(seq p.Tuple2[string, string]) m.Expr {
+		return m.CopyColumnAbove{
+			Col: seq.A,
+		}
+	},
+)
+
+var copyLastInColumnParser = Map(
+	p.SequenceOf3[string, string, string](colRefParser, p.Rune('^'), p.Rune('v')),
+	func(seq p.Tuple3[string, string, string]) m.Expr {
+		return m.CopyLastInColumn{
+			Col: seq.A,
+		}
+	},
+)
+
 var labelName = Map(
 	p.OneOrMore[string](p.Any[string](
 		p.RuneInRanges(unicode.Lower),
@@ -63,7 +105,7 @@ var labelName = Map(
 	},
 )
 var relativeRowRefParser = Map(
-	p.SequenceOf3[string, int, string](p.Rune('<'), intLitParser, p.Rune('>')),
+	p.SequenceOf3[string, int, string](p.Rune('<'), intParser, p.Rune('>')),
 	func(t p.Tuple3[string, int, string]) int {
 		return t.B
 	},
@@ -74,10 +116,10 @@ var labelRelativeRowRefParser = Map(
 		labelName,
 		relativeRowRefParser,
 	),
-	func(t p.Tuple3[string, string, int]) p.Tuple2[string, int] {
-		return p.Tuple2[string, int]{
-			A: t.B, // label name
-			B: t.C, // relative row number
+	func(t p.Tuple3[string, string, int]) m.Expr {
+		return m.LabelRelativeRowRef{
+			Label:       t.B, // label name
+			RelativeRow: t.C, // relative row number
 		}
 	},
 )
@@ -89,12 +131,29 @@ var chompWhiteSpace p.Parser[m.NoResult] = Map(
 	},
 )
 
-// temporary, eventually will include (expr), float, funCall, unaryOps
-var primaryParser = Map(
-	intLitParser,
-	func(value int) m.IntLit {
-		return m.IntLit(value)
+var subExprParser p.Parser[m.Expr] = Map(
+	p.SequenceOf3[string, m.Expr, string](
+		lParen,
+		exprParser,
+		rParen,
+	),
+	func(seq p.Tuple3[string, m.Expr, string]) m.Expr {
+		return seq.B
 	},
+)
+
+// temporary, eventually will include (expr), float, funCall, unaryOps
+var primaryParser p.Parser[m.Expr] = p.Any[m.Expr](
+	funCallParser,
+	stringLitParser,
+	floatLitParser,
+	intLitParser,
+	subExprParser,
+	cellRefParser,
+	copyAboveParser,
+	copyLastInColumnParser,
+	copyColumnAboveParser,
+	labelRelativeRowRefParser,
 )
 
 var binaryOperatorParser = Map(
@@ -122,7 +181,7 @@ var exprParser p.Parser[m.Expr] = p.Func(func(in *p.Input) (match m.Expr, ok boo
 
 	chompWhiteSpace.Parse(in)
 
-	pMatch, ok, err := primaryParser.Parse(in)
+	pMatch, ok, err := primaryParserProxy.Parse(in)
 	if !ok || err != nil {
 		return
 	}
@@ -138,7 +197,7 @@ var exprParser p.Parser[m.Expr] = p.Func(func(in *p.Input) (match m.Expr, ok boo
 		}
 		binOps = append(binOps, oMatch)
 		chompWhiteSpace.Parse(in)
-		match, ok, err := primaryParser.Parse(in)
+		match, ok, err := primaryParserProxy.Parse(in)
 		if !ok || err != nil {
 			return match, ok, err
 		}
@@ -159,13 +218,13 @@ var funNameParser = Map(
 )
 
 var argSeparatorParser = Map(
-	parse.SequenceOf3[model.NoResult, string, model.NoResult](
+	p.SequenceOf3[m.NoResult, string, m.NoResult](
 		chompWhiteSpace,
-		parse.Rune(','),
+		p.Rune(','),
 		chompWhiteSpace,
 	),
-	func(_ parse.Tuple3[model.NoResult, string, model.NoResult]) model.NoResult {
-		return model.NoResult{}
+	func(_ p.Tuple3[m.NoResult, string, m.NoResult]) m.NoResult {
+		return m.NoResult{}
 	},
 )
 
@@ -178,7 +237,7 @@ var funCallParser = Map(
 		argListParser,
 		rParen,
 	),
-	func(seq p.Tuple4[string, string, []m.Expr, string]) m.FunCall {
+	func(seq p.Tuple4[string, string, []m.Expr, string]) m.Expr {
 		return m.FunCall{
 			Name:   seq.A,
 			Params: seq.C,

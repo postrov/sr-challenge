@@ -8,8 +8,10 @@ type mapParser[A, B any] struct {
 }
 
 func (p mapParser[A, B]) Parse(in *p.Input) (match B, ok bool, err error) {
+	start := in.Index()
 	matchA, ok, err := p.A.Parse(in)
 	if err != nil || !ok {
+		in.Seek(start)
 		return
 	}
 
@@ -32,8 +34,10 @@ type fallibleMapParser[A, B any] struct {
 }
 
 func (p fallibleMapParser[A, B]) Parse(in *p.Input) (match B, ok bool, err error) {
+	start := in.Index()
 	matchA, ok, err := p.A.Parse(in)
 	if err != nil || !ok {
+		in.Seek(start)
 		return
 	}
 

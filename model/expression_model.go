@@ -1,9 +1,5 @@
 package model
 
-import (
-	"fmt"
-)
-
 type Expr interface {
 	isExpr()
 }
@@ -13,24 +9,7 @@ type FunCall struct {
 	Params []Expr
 }
 
-func (FunCall) isExpr() {}
-
 type BinaryOperator int
-
-func (op BinaryOperator) String() string {
-	switch op {
-	case MUL:
-		return "*"
-	case DIV:
-		return "/"
-	case ADD:
-		return "+"
-	case SUB:
-		return "-"
-	default:
-		return "?"
-	}
-}
 
 const (
 	MUL BinaryOperator = 0
@@ -40,8 +19,26 @@ const (
 )
 
 type IntLit int
+type FloatLit float64
+type StringLit string
 
-func (IntLit) isExpr() {}
+type CellRef struct {
+	Col string
+	Row int
+}
+
+type CopyAbove struct{}
+type CopyLastInColumn struct {
+	Col string
+}
+type CopyColumnAbove struct {
+	Col string
+}
+
+type LabelRelativeRowRef struct {
+	Label       string
+	RelativeRow int
+}
 
 type InfixOp struct {
 	Lhs Expr
@@ -49,20 +46,17 @@ type InfixOp struct {
 	Op  BinaryOperator
 }
 
-func formatInfixOperand(e Expr) string {
-	switch e.(type) {
-	case InfixOp:
-		return fmt.Sprintf("(%v)", e)
-	default:
-		return fmt.Sprint(e)
-	}
-}
-
-func (op InfixOp) String() string {
-	lhs, rhs := formatInfixOperand(op.Lhs), formatInfixOperand(op.Rhs)
-	return fmt.Sprintf("%v %v %v", lhs, op.Op, rhs)
-}
-
-func (InfixOp) isExpr() {}
-
 type NoResult struct{}
+
+// Make sure all the expression variants implement Expr
+func (IntLit) isExpr()    {}
+func (FloatLit) isExpr()  {}
+func (StringLit) isExpr() {}
+func (InfixOp) isExpr()   {}
+func (FunCall) isExpr()   {}
+
+func (CellRef) isExpr()             {}
+func (CopyAbove) isExpr()           {}
+func (CopyLastInColumn) isExpr()    {}
+func (LabelRelativeRowRef) isExpr() {}
+func (CopyColumnAbove) isExpr()     {}
