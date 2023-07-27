@@ -5,15 +5,21 @@ import m "pasza.org/sr-challenge/model"
 // Simplified arithmetic operator precedence fix for an expression, based on pseudocode from:
 // https://en.wikipedia.org/wiki/Operator-precedence_parser#Pseudocode
 
-// simplified operator priority fix
-func fixOperatorPrecedence(primaries []ArExpr, binOps []m.BinOp) ArExpr {
+var opPrecedence map[m.BinaryOperator]int = map[m.BinaryOperator]int{
+	m.MUL: 2,
+	m.DIV: 2,
+	m.ADD: 1,
+	m.SUB: 1,
+}
 
+// simplified operator priority fix
+func fixOperatorPrecedence(primaries []m.Expr, binOps []m.BinaryOperator) m.Expr {
 	lhs := primaries[0]
 	res, _, _ := fixOperatorPrecedenceRec(lhs, primaries, binOps, 1, 0, 0)
 	return res
 }
 
-func fixOperatorPrecedenceRec(lhs ArExpr, primaries []ArExpr, binOps []m.BinOp, pIndex int, oIndex int, minPrecedence int) (res ArExpr, newPIndex int, newOIndex int) {
+func fixOperatorPrecedenceRec(lhs m.Expr, primaries []m.Expr, binOps []m.BinaryOperator, pIndex int, oIndex int, minPrecedence int) (res m.Expr, newPIndex int, newOIndex int) {
 	if pIndex >= len(primaries) {
 		return lhs, pIndex, pIndex - 1
 	}
@@ -35,10 +41,10 @@ func fixOperatorPrecedenceRec(lhs ArExpr, primaries []ArExpr, binOps []m.BinOp, 
 			}
 			rhs, pIndex, oIndex = fixOperatorPrecedenceRec(rhs, primaries, binOps, pIndex, oIndex, opPrec+1)
 		}
-		lhs = Op{
-			lhs: lhs,
-			rhs: rhs,
-			op:  op,
+		lhs = m.InfixOp{
+			Lhs: lhs,
+			Rhs: rhs,
+			Op:  op,
 		}
 	}
 	return lhs, pIndex, oIndex

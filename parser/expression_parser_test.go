@@ -7,6 +7,7 @@ import (
 
 	p "github.com/a-h/parse"
 	"github.com/stretchr/testify/assert"
+	"pasza.org/sr-challenge/model"
 )
 
 func TestLabelNameParser(t *testing.T) {
@@ -105,7 +106,7 @@ func TestStringLiteralParser(t *testing.T) {
 
 /// arExpr
 
-func TestArExprParser(t *testing.T) {
+func TestExprParser(t *testing.T) {
 	cases := []struct {
 		in   string
 		want string
@@ -130,11 +131,11 @@ func TestIntLitParser(t *testing.T) {
 	m, o, e := parsePrimary.Parse(in)
 	assert.True(t, o)
 	assert.Nil(t, e)
-	assert.Equal(t, IntLit(123), m)
+	assert.Equal(t, model.IntLit(123), m)
 
 	in = p.NewInput("1 + 2 * 3")
 	m, o, e = parsePrimary.Parse(in)
 	assert.True(t, o)
 	assert.Nil(t, e)
-	assert.Equal(t, IntLit(1), m)
+	assert.Equal(t, model.IntLit(1), m)
 }

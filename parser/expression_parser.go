@@ -90,43 +90,9 @@ var labelRelativeRowRef = Map(
 
 ///// 1 + 2 * 3
 
-type ArExpr interface {
-	isArExpr()
-}
-
-type IntLit int
-
-func (IntLit) isArExpr() {}
-
-type Op struct {
-	lhs ArExpr
-	rhs ArExpr
-	op  m.BinOp
-}
-
-func (op Op) String() string {
-	var lhs, rhs string
-	if v, ok := op.lhs.(IntLit); ok {
-		lhs = strconv.Itoa(int(v))
-	} else {
-		lhs = fmt.Sprintf("(%v)", op.lhs)
-	}
-	if v, ok := op.rhs.(IntLit); ok {
-		rhs = strconv.Itoa(int(v))
-	} else {
-		rhs = fmt.Sprintf("(%v)", op.rhs)
-	}
-
-	return fmt.Sprintf("%v %v %v", lhs, op.op, rhs)
-}
-
-func (Op) isArExpr() {}
-
-type NoResult struct{}
-
-var chompWhiteSpace p.Parser[NoResult] = Map(
+var chompWhiteSpace p.Parser[m.NoResult] = Map(
 	p.ZeroOrMore(p.RuneIn(" \t")),
-	func([]string) NoResult {
+	func([]string) m.NoResult {
 		return struct{}{}
 	},
 )
@@ -134,14 +100,14 @@ var chompWhiteSpace p.Parser[NoResult] = Map(
 // temporary, eventually will include (expr), float, funCall, unaryOps
 var parsePrimary = Map(
 	intLiteral,
-	func(value int) IntLit {
-		return IntLit(value)
+	func(value int) m.IntLit {
+		return m.IntLit(value)
 	},
 )
 
 var parseBinOp = Map(
 	p.RuneIn("+-*/"),
-	func(op string) m.BinOp {
+	func(op string) m.BinaryOperator {
 		switch op {
 		case "+":
 			return m.ADD
@@ -157,9 +123,9 @@ var parseBinOp = Map(
 	},
 )
 
-var arExprParser p.Parser[ArExpr] = p.Func(func(in *p.Input) (match ArExpr, ok bool, err error) {
-	primaries := make([]ArExpr, 0)
-	binOps := make([]m.BinOp, 0)
+var arExprParser p.Parser[m.Expr] = p.Func(func(in *p.Input) (match m.Expr, ok bool, err error) {
+	primaries := make([]m.Expr, 0)
+	binOps := make([]m.BinaryOperator, 0)
 
 	chompWhiteSpace.Parse(in)
 
@@ -175,7 +141,7 @@ var arExprParser p.Parser[ArExpr] = p.Func(func(in *p.Input) (match ArExpr, ok b
 			break
 		}
 		if err != nil {
-			return IntLit(3), ok, err
+			return m.IntLit(3), ok, err
 		}
 		binOps = append(binOps, oMatch)
 		chompWhiteSpace.Parse(in)
@@ -193,10 +159,3 @@ var arExprParser p.Parser[ArExpr] = p.Func(func(in *p.Input) (match ArExpr, ok b
 	match = fixOperatorPrecedence(primaries, binOps)
 	return
 })
-
-var opPrecedence map[m.BinOp]int = map[m.BinOp]int{
-	m.MUL: 2,
-	m.DIV: 2,
-	m.ADD: 1,
-	m.SUB: 1,
-}
