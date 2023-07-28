@@ -28,22 +28,8 @@ type Formula interface {
 	isFormula()
 }
 
-type Row struct {
-	Len   int
-	Cells []Cell
-}
-
-type RowGroup struct {
-	Len    int      // number of rows in this row group
-	RowLen int      // length of each individual row
-	Labels []string // Column labels
-}
-
-type EmptyCell struct{}
-
 func (StringCell) isCell()  {}
 func (IntCell) isCell()     {}
 func (FloatCell) isCell()   {}
 func (LabelCell) isCell()   {}
 func (FormulaCell) isCell() {}
-func (EmptyCell) isCell()   {}

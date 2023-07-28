@@ -148,8 +148,6 @@ func calcCell(es *evalState, rowIdx int, colIdx int) {
 		esCell.value = floatValue(v.Value)
 	case m.StringCell:
 		esCell.value = stringValue(v.Value)
-	case m.EmptyCell:
-		esCell.value = stringValue("")
 	case m.FormulaCell:
 		calcFormulaCell(es, rowIdx, colIdx, &v)
 	default:
