@@ -38,6 +38,19 @@ var floatCellParser = Map(
 		}
 	},
 )
+
+var labelCellParser = Map(
+	p.SequenceOf2[string, string](
+		p.Rune('!'),
+		stringUntilEOFParser,
+	),
+	func(seq p.Tuple2[string, string]) m.Cell {
+		return m.LabelCell{
+			Label: seq.B,
+		}
+	},
+)
+
 var formulaCellParser = Map(
 	p.SequenceOf3[string, m.Expr](
 		p.Rune('='),
@@ -51,12 +64,14 @@ var formulaCellParser = Map(
 	},
 )
 
+var stringUntilEOFParser = p.StringUntilEOF[m.NoResult](
+	p.Func[m.NoResult](func(in *p.Input) (m.NoResult, bool, error) {
+		return m.NoResult{}, false, nil
+	}),
+)
+
 var stringCellParser = Map(
-	p.StringUntilEOF[m.NoResult](
-		p.Func[m.NoResult](func(in *p.Input) (m.NoResult, bool, error) {
-			return m.NoResult{}, false, nil
-		}),
-	),
+	stringUntilEOFParser,
 	func(s string) m.Cell {
 		return m.StringCell{
 			Value: s,
@@ -69,6 +84,7 @@ var cellParser = FallibleMap(
 	func(s string) (m.Cell, error) {
 		s = strings.TrimSpace(s)
 		match, ok, err := p.Any[m.Cell](
+			labelCellParser,
 			formulaCellParser,
 			floatCellParser,
 			intCellParser,

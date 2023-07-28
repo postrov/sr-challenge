@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+
+	"pasza.org/sr-challenge/formatter"
 )
 
 func (op BinaryOperator) String() string {
@@ -58,7 +60,7 @@ func (v IntLit) String() string {
 }
 
 func (v FloatLit) String() string {
-	return strconv.FormatFloat(float64(v), 'f', 3, 64)
+	return formatter.Ftoa(float64(v))
 }
 
 func (s StringLit) String() string {

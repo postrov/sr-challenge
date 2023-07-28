@@ -16,6 +16,10 @@ type StringCell struct {
 	Value string
 }
 
+type LabelCell struct {
+	Label string
+}
+
 type FormulaCell struct {
 	Formula Expr
 }
@@ -40,5 +44,6 @@ type EmptyCell struct{}
 func (StringCell) isCell()  {}
 func (IntCell) isCell()     {}
 func (FloatCell) isCell()   {}
+func (LabelCell) isCell()   {}
 func (FormulaCell) isCell() {}
 func (EmptyCell) isCell()   {}

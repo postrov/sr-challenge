@@ -3,10 +3,10 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 
+	"pasza.org/sr-challenge/evaluator"
 	"pasza.org/sr-challenge/parser"
 )
 
@@ -40,7 +40,8 @@ func validateCommandLine() (inputPath, outputPath string) {
 	return
 }
 
-func writeOutput(outputPath string) {
+// Writes output to file or to stdout
+func writeOutput(outputPath string, result [][]evaluator.CalculatedValue) {
 	var f *os.File
 	var err error
 	if outputPath != "" {
@@ -55,13 +56,25 @@ func writeOutput(outputPath string) {
 	}
 	writer := bufio.NewWriter(f)
 	// do the writing here
-	writer.WriteString("ala ma kota\n") // todo
+	for _, row := range result {
+		first := true
+		for _, cell := range row {
+			if first {
+				first = false
+			} else {
+				writer.WriteString(" |")
+			}
+			writer.WriteString(cell.String())
+		}
+		writer.WriteString("\n")
+	}
+	// done writing
 	defer writer.Flush()
 }
 
 func main() {
 	inputPath, outputPath := validateCommandLine()
-	input, err := ioutil.ReadFile(inputPath)
+	input, err := os.ReadFile(inputPath)
 	if err != nil {
 		log.Fatal(err)
 		os.Exit(1)
@@ -77,12 +90,7 @@ func main() {
 		os.Exit(1)
 	}
 	// evaluate
+	result := evaluator.Evaluate(csv)
 	// format output
-	writeOutput(outputPath)
-	for i, r := range csv {
-		log.Printf("row: %d\n", i)
-		for _, c := range r {
-			log.Print(c)
-		}
-	}
+	writeOutput(outputPath, result)
 }
