@@ -1,7 +1,6 @@
 package parser
 
 import (
-	"log"
 	"strings"
 
 	p "github.com/a-h/parse"
@@ -91,7 +90,7 @@ var rowParser p.Parser[[]m.Cell] = p.Func(func(in *p.Input) (match []m.Cell, ok 
 	return
 })
 
-var CSVParser p.Parser[[][]m.Cell] = p.Until(rowParser, p.EOF[string]())
+var csvParser p.Parser[[][]m.Cell] = p.Until(rowParser, p.EOF[string]())
 
 const csvData string = `!date         |!transaction_id                        |!tokens        |!token_prices          |!total_cost
 2022-02-20    |=concat("t_", text(incFrom(1)))        |btc,eth,dai    |38341.88,2643.77,1.0003|=sum(spread(split(D2, ",")))
@@ -111,31 +110,8 @@ const csvData string = `!date         |!transaction_id                        |!
 !cost_too_high|                                       |               |                       |
 =text(bte(@adjusted_cost<1>, @cost_threshold<1>)      |               |                       |`
 
-func Parser() string {
+func ParseCSV(csvData string) ([][]m.Cell, bool, error) {
 	input := p.NewInput(csvData)
 
-	match, ok, err := CSVParser.Parse(input)
-
-	if err != nil {
-		log.Fatalf("failed to parse: %v\n", err)
-	}
-
-	if !ok {
-		log.Print("expected CSV not matched\n")
-	}
-
-	// this is for whole CSV
-	for i, r := range match {
-		log.Printf("row: %d\n", i)
-		for _, c := range r {
-			log.Print(c)
-		}
-	}
-
-	// this is for row
-	// for i, c := range match {
-	// 	log.Printf("cell[%d]: %s", i, c)
-	// }
-
-	return "xxx"
+	return csvParser.Parse(input)
 }
