@@ -4,23 +4,25 @@ type Cell interface {
 	isCell()
 }
 
+type IntCell struct {
+	Value int
+}
+
+type FloatCell struct {
+	Value float64
+}
+
 type StringCell struct {
 	Value string
 }
 
 type FormulaCell struct {
-	Formula Formula
+	Formula Expr
 }
 
 type Formula interface {
 	isFormula()
 }
-
-type DummyFormula struct {
-	RawValue string
-}
-
-func (DummyFormula) isFormula() {}
 
 type Row struct {
 	Len   int
@@ -35,10 +37,8 @@ type RowGroup struct {
 
 type EmptyCell struct{}
 
-func (StringCell) isCell() {}
-
+func (StringCell) isCell()  {}
+func (IntCell) isCell()     {}
+func (FloatCell) isCell()   {}
 func (FormulaCell) isCell() {}
-
-func (EmptyCell) isCell() {}
-
-// expr: float | int | cellref | unary op
+func (EmptyCell) isCell()   {}
