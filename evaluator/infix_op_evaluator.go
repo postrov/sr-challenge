@@ -10,7 +10,7 @@ import (
 func calcMul(lhs, rhs CalculatedValue) CalculatedValue {
 	switch l := lhs.(type) {
 	case intValue:
-		switch r := lhs.(type) {
+		switch r := rhs.(type) {
 		case intValue:
 			return intValue(l * r)
 		case floatValue:
@@ -20,7 +20,7 @@ func calcMul(lhs, rhs CalculatedValue) CalculatedValue {
 
 		}
 	case floatValue:
-		switch r := lhs.(type) {
+		switch r := rhs.(type) {
 		case intValue:
 			return floatValue(float64(l) * float64(r))
 		case floatValue:
@@ -41,7 +41,7 @@ func calcMul(lhs, rhs CalculatedValue) CalculatedValue {
 func calcDiv(lhs, rhs CalculatedValue) CalculatedValue {
 	switch l := lhs.(type) {
 	case intValue:
-		switch r := lhs.(type) {
+		switch r := rhs.(type) {
 		case intValue:
 			return intValue(l / r)
 		case floatValue:
@@ -51,7 +51,7 @@ func calcDiv(lhs, rhs CalculatedValue) CalculatedValue {
 
 		}
 	case floatValue:
-		switch r := lhs.(type) {
+		switch r := rhs.(type) {
 		case intValue:
 			return floatValue(float64(l) / float64(r))
 		case floatValue:
@@ -71,7 +71,7 @@ func calcDiv(lhs, rhs CalculatedValue) CalculatedValue {
 func calcAdd(lhs, rhs CalculatedValue) CalculatedValue {
 	switch l := lhs.(type) {
 	case intValue:
-		switch r := lhs.(type) {
+		switch r := rhs.(type) {
 		case intValue:
 			return intValue(l + r)
 		case floatValue:
@@ -81,7 +81,7 @@ func calcAdd(lhs, rhs CalculatedValue) CalculatedValue {
 
 		}
 	case floatValue:
-		switch r := lhs.(type) {
+		switch r := rhs.(type) {
 		case intValue:
 			return floatValue(float64(l) + float64(r))
 		case floatValue:
@@ -91,7 +91,7 @@ func calcAdd(lhs, rhs CalculatedValue) CalculatedValue {
 
 		}
 	case stringValue:
-		switch r := lhs.(type) {
+		switch r := rhs.(type) {
 		case intValue:
 			return stringValue(l + stringValue(strconv.Itoa(int(r))))
 		case floatValue:
@@ -109,7 +109,7 @@ func calcAdd(lhs, rhs CalculatedValue) CalculatedValue {
 func calcSub(lhs, rhs CalculatedValue) CalculatedValue {
 	switch l := lhs.(type) {
 	case intValue:
-		switch r := lhs.(type) {
+		switch r := rhs.(type) {
 		case intValue:
 			return intValue(l - r)
 		case floatValue:
@@ -119,7 +119,7 @@ func calcSub(lhs, rhs CalculatedValue) CalculatedValue {
 
 		}
 	case floatValue:
-		switch r := lhs.(type) {
+		switch r := rhs.(type) {
 		case intValue:
 			return floatValue(float64(l) - float64(r))
 		case floatValue:
@@ -138,14 +138,14 @@ func calcSub(lhs, rhs CalculatedValue) CalculatedValue {
 func bte_(lhs, rhs CalculatedValue) CalculatedValue {
 	switch l := lhs.(type) {
 	case intValue:
-		switch r := lhs.(type) {
+		switch r := rhs.(type) {
 		case intValue:
 			return boolValue(l <= r)
 		case floatValue:
 			return boolValue(float64(l) <= float64(r))
 		}
 	case floatValue:
-		switch r := lhs.(type) {
+		switch r := rhs.(type) {
 		case intValue:
 			return boolValue(float64(l) <= float64(r))
 		case floatValue:
